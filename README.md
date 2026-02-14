@@ -2,7 +2,7 @@
 
 A chatbot that helps international students in the U.S. understand their tax obligations. It uses **RAG** (Retrieval-Augmented Generation) — meaning it searches through real IRS publications, tax treaties, and university guides to give grounded answers instead of making things up.
 
-**All free** — no paid APIs or servers needed.
+
 
 ---
 
