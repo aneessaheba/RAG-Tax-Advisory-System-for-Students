@@ -1,4 +1,4 @@
-
+# RAG Tax Advisor for International Students
 
 A chatbot that helps international students in the U.S. understand their tax obligations. It uses **RAG** (Retrieval-Augmented Generation) — meaning it searches through real IRS publications, tax treaties, and university guides to give grounded answers instead of making things up.
 
