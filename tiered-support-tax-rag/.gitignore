@@ -1,0 +1,7 @@
+# Ignore data and secrets
+data_raw/
+data_work/
+.env
+.env.*
+__pycache__/
+*.pyc

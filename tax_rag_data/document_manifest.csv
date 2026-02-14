@@ -1,0 +1,42 @@
+doc_id,source_type,folder,title,year,country,filename
+irs_pub519,IRS_PUBLICATION,irs_publications,Publication 519 - U.S. Tax Guide for Aliens,2025,,p519.pdf
+irs_pub901,IRS_PUBLICATION,irs_publications,Publication 901 - U.S. Tax Treaties,2025,,p901.pdf
+irs_pub970,IRS_PUBLICATION,irs_publications,Publication 970 - Tax Benefits for Education,2025,,p970.pdf
+irs_pub17,IRS_PUBLICATION,irs_publications,Publication 17 - Your Federal Income Tax,2025,,p17.pdf
+irs_1040nr_instr,IRS_FORM,irs_forms,Instructions for Form 1040-NR,2025,,i1040nr.pdf
+irs_f8843,IRS_FORM,irs_forms,Form 8843 - Statement for Exempt Individuals,2025,,f8843.pdf
+irs_f8233,IRS_FORM,irs_forms,Form 8233 - Exemption from Withholding,2025,,f8233.pdf
+irs_fw8ben,IRS_FORM,irs_forms,Form W-8BEN - Certificate of Foreign Status,2025,,fw8ben.pdf
+irs_fw2,IRS_FORM,irs_forms,Form W-2 - Wage and Tax Statement,2025,,fw2.pdf
+irs_f1098t,IRS_FORM,irs_forms,Form 1098-T - Tuition Statement,2025,,f1098t.pdf
+irs_i1098et,IRS_FORM,irs_forms,Instructions for Forms 1098-E and 1098-T,2025,,i1098et.pdf
+treaty_india,TREATY,treaties,U.S.-India Tax Treaty,,India,india.pdf
+treaty_india_tech,TREATY,treaties,U.S.-India Tax Treaty Technical Explanation,,India,inditech.pdf
+treaty_china,TREATY,treaties,U.S.-China Tax Treaty,,China,china.pdf
+treaty_china_tech,TREATY,treaties,U.S.-China Tax Treaty Technical Explanation,,China,chintech.pdf
+treaty_korea,TREATY,treaties,U.S.-Korea Tax Treaty,,South Korea,korea.pdf
+treaty_korea_tech,TREATY,treaties,U.S.-Korea Tax Treaty Technical Explanation,,South Korea,koreatech.pdf
+treaty_canada,TREATY,treaties,U.S.-Canada Tax Treaty,,Canada,canada.pdf
+treaty_canada_tech,TREATY,treaties,U.S.-Canada Tax Treaty Technical Explanation,,Canada,canatech.pdf
+treaty_germany,TREATY,treaties,U.S.-Germany Tax Treaty,,Germany,germany.pdf
+treaty_germany_tech,TREATY,treaties,U.S.-Germany Tax Treaty Technical Explanation,,Germany,germtech.pdf
+treaty_mexico,TREATY,treaties,U.S.-Mexico Tax Treaty,,Mexico,mexico.pdf
+treaty_mexico_tech,TREATY,treaties,U.S.-Mexico Tax Treaty Technical Explanation,,Mexico,mexicotech.pdf
+treaty_japan,TREATY,treaties,U.S.-Japan Tax Treaty,,Japan,japan.pdf
+treaty_japan_tech,TREATY,treaties,U.S.-Japan Tax Treaty Technical Explanation,,Japan,japatech.pdf
+uni_intl_tax_factsheet,UNIVERSITY,university_guides,International Student Tax Fact Sheet,2024,,International-Student-Tax-FactSheet.pdf
+uni_intl_faq,UNIVERSITY,university_guides,International Student Tax FAQ,2024,,International FAQ's.pdf
+uni_tax_info_session,UNIVERSITY,university_guides,Tax Info Session for International Students,2024,,taxes-info-session.pdf
+uni_scholars_faq,UNIVERSITY,university_guides,International Students and Scholars FAQs,2024,,International_Students_Scholars_FAQs.pdf
+uni_tax_filing_guide,UNIVERSITY,university_guides,International Student Tax Filing Guide,2024,,International+Student+Tax+Filing+Guide.pdf
+uni_litc_guide,UNIVERSITY,university_guides,UW LITC International Student Taxes Guide,2024,,UW-LITC-Intl-Student-Taxes.pdf
+uni_employee_tax_guide,UNIVERSITY,university_guides,International Student Employee Tax Guide,2024,,International-Student-Employee-Tax-Guide.pdf
+uni_tax_compliance,UNIVERSITY,university_guides,International Student Tax Compliance Handout,2024,,International-Student-Tax-Compliance-Handout.pdf
+uni_f1_tax_info,UNIVERSITY,university_guides,Tax Information for F-1 Students,2024,,Employment-07--Tax-Information-for-F-1-Students.pdf
+uni_opt_cpt_info,UNIVERSITY,university_guides,F-1 OPT and CPT Tax Info,2024,,F-1-OPT-and-CPT-Info.pdf
+uni_2024_tax_year,UNIVERSITY,university_guides,International Student Taxes 2024 Tax Year,2024,,international-student-taxes-2024-tax-year.pdf
+uni_income_tax_faq,UNIVERSITY,university_guides,Income Tax FAQ,2024,,Income Tax FAQ.pdf
+uni_taxes_intl,UNIVERSITY,university_guides,Taxes for International Students,2024,,Taxes for Intl Students.pdf
+uni_tax_info,UNIVERSITY,university_guides,Tax Information,2024,,Tax-Information.pdf
+uni_pa_guidance,UNIVERSITY,university_guides,Guidance for International Students - Pennsylvania Taxes,2024,,Guidance for International Students for Completing Pennsylvania.pdf
+uni_ssa_info,UNIVERSITY,university_guides,Social Security for International Students,2024,,EN-05-10181.pdf
