@@ -7,7 +7,7 @@ import json
 from dotenv import load_dotenv
 import chromadb
 from sentence_transformers import SentenceTransformer
-import google.generativeai as genai
+from google import genai
 
 load_dotenv()  # loads GEMINI_API_KEY from .env file
 
@@ -107,8 +107,8 @@ Student's question: {question}
 
 Provide a clear, helpful answer:"""
 
-    model = genai.GenerativeModel("gemini-2.0-flash")
-    response = model.generate_content(prompt)
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
     return response.text
 
 
@@ -119,7 +119,6 @@ def main():
         print("ERROR: Set GEMINI_API_KEY environment variable.")
         print("Get a free key at: https://aistudio.google.com/apikey")
         return
-    genai.configure(api_key=api_key)
 
     # Load models and DB
     print("Loading embedding model...")

@@ -1,0 +1,52 @@
+[
+  {
+    "question": "Do F-1 students need to file Form 8843?",
+    "expected_keywords": ["8843", "exempt", "F-1"],
+    "note": "F-1 students must file Form 8843 even with no income"
+  },
+  {
+    "question": "Can nonresident aliens claim the standard deduction?",
+    "expected_keywords": ["standard deduction", "nonresident"],
+    "note": "Nonresident aliens generally cannot claim the standard deduction"
+  },
+  {
+    "question": "What tax return form do nonresident aliens file?",
+    "expected_keywords": ["1040-NR", "nonresident"],
+    "note": "Nonresident aliens file Form 1040-NR"
+  },
+  {
+    "question": "Are F-1 students exempt from FICA Social Security and Medicare taxes?",
+    "expected_keywords": ["FICA", "Social Security", "Medicare", "exempt"],
+    "note": "F-1 students are generally exempt from FICA for 5 years"
+  },
+  {
+    "question": "What is the substantial presence test?",
+    "expected_keywords": ["substantial presence", "183", "days"],
+    "note": "183-day weighted formula to determine residency for tax purposes"
+  },
+  {
+    "question": "Does the US-India tax treaty provide benefits to students?",
+    "expected_keywords": ["India", "treaty", "student"],
+    "note": "Article 21 of the US-India treaty exempts scholarship/fellowship income"
+  },
+  {
+    "question": "What is Form 1098-T used for?",
+    "expected_keywords": ["1098-T", "tuition", "education"],
+    "note": "Form 1098-T reports tuition payments for education tax benefits"
+  },
+  {
+    "question": "Do international students on OPT need to pay taxes?",
+    "expected_keywords": ["OPT", "tax", "income"],
+    "note": "OPT income is taxable; students must file 1040-NR"
+  },
+  {
+    "question": "What is Form W-8BEN used for?",
+    "expected_keywords": ["W-8BEN", "foreign", "withholding"],
+    "note": "W-8BEN certifies foreign status and claims treaty benefits"
+  },
+  {
+    "question": "When is the tax filing deadline for nonresident aliens?",
+    "expected_keywords": ["April 15", "deadline", "filing"],
+    "note": "April 15 is the general deadline; June 15 if no US wages"
+  }
+]
