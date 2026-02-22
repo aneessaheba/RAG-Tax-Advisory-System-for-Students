@@ -169,6 +169,35 @@ Each score is 0.0–1.0. The overall Judge score is their average.
 
 ---
 
+### Feature 4 — Latency and Token Tracking
+
+Every query logs how long each step takes and estimates token usage. Printed after each answer and saved to `query_log.jsonl`.
+
+**What's tracked:**
+
+| Field | Description |
+|-------|-------------|
+| `retrieval_latency_s` | Time for hybrid search (BM25 + vector + RRF) |
+| `llm_latency_s` | Time for Gemini API call |
+| `total_latency_s` | End-to-end time |
+| `input_tokens_est` | Estimated prompt tokens (chars ÷ 4) |
+| `output_tokens_est` | Estimated answer tokens (chars ÷ 4) |
+| `used_fallback` | Whether Gemini was unavailable |
+
+**Sample output after each answer:**
+```
+[Retrieval: 0.12s | LLM: 2.34s | Total: 2.46s | ~1823 in / 142 out tokens]
+```
+
+**Sample `query_log.jsonl` entry:**
+```json
+{"timestamp": "2026-02-21T17:30:00", "question": "Do I need to file Form 8843?",
+ "confidence": 0.84, "retrieval_latency_s": 0.12, "llm_latency_s": 2.34,
+ "total_latency_s": 2.46, "input_tokens_est": 1823, "output_tokens_est": 142, "used_fallback": false}
+```
+
+---
+
 ## Tech Stack (All Free)
 
 | Component | Tool | Why |
