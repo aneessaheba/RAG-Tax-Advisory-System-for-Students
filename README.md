@@ -10,15 +10,15 @@ A chatbot that answers U.S. tax questions for international students. Instead of
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                        DATA PIPELINE  (run once)                            ║
+║                        DATA PIPELINE  (run once)                             ║
 ║                                                                              ║
 ║   41 PDFs                                                                    ║
 ║   ├── IRS Publications  (Pub 519, 901, 970, 17)                              ║
-║   ├── IRS Forms         (1040-NR, 8843, 8233, W-8BEN, W-2, 1098-T)          ║
+║   ├── IRS Forms         (1040-NR, 8843, 8233, W-8BEN, W-2, 1098-T)           ║
 ║   ├── Tax Treaties      (India, China, Korea, Canada, 10+ countries)         ║
-║   └── University Guides (20+ guides from U.S. universities)                 ║
+║   └── University Guides (20+ guides from U.S. universities)                  ║
 ║             │                                                                ║
-║             ▼  Step 1 — extract_pdfs_to_json.py  (PyMuPDF)                  ║
+║             ▼  Step 1 — extract_pdfs_to_json.py  (PyMuPDF)                   ║
 ║        Page-by-page text extracted → saved as JSON                           ║
 ║             │                                                                ║
 ║             ▼  Step 2 — clean_parsed_json.py                                 ║
@@ -27,7 +27,7 @@ A chatbot that answers U.S. tax questions for international students. Instead of
 ║             ▼  Step 3 — split_clean_json_to_chunks.py                        ║
 ║        Split into 500-word chunks with 100-word overlap → 2,247 chunks       ║
 ║             │                                                                ║
-║             ▼  Step 4 — embed_chunks.py  (all-MiniLM-L6-v2, runs locally)   ║
+║             ▼  Step 4 — embed_chunks.py  (all-MiniLM-L6-v2, runs locally)    ║
 ║        Each chunk → 384-dimensional vector                                   ║
 ║             │                                                                ║
 ║             ▼  Step 5 — upload_to_chromadb.py                                ║
@@ -37,7 +37,7 @@ A chatbot that answers U.S. tax questions for international students. Instead of
                                     │ (stored on disk, loaded at startup)
                                     ▼
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                          CHATBOT  (app.py)                                  ║
+║                          CHATBOT  (app.py)                                   ║
 ║                                                                              ║
 ║  Startup                                                                     ║
 ║  ├── Load ChromaDB (2,247 chunks)                                            ║
@@ -49,65 +49,65 @@ A chatbot that answers U.S. tax questions for international students. Instead of
 ║  Student types question                                                      ║
 ║       │                                                                      ║
 ║       ▼                                                                      ║
-║  ┌─────────────────────────────────────────────────────┐                    ║
-║  │  GUARD 1 — Keyword Filter                           │                    ║
-║  │  Does question contain any of ~40 tax keywords?     │                    ║
-║  │  (tax, irs, form, filing, visa, fica, opt, itin...) │                    ║
-║  └──────────────┬──────────────────────────────────────┘                    ║
-║                 │ No → "Not a tax question" — STOP                          ║
-║                 │ Yes ↓                                                     ║
+║  ┌─────────────────────────────────────────────────────┐                     ║
+║  │  GUARD 1 — Keyword Filter                           │                     ║
+║  │  Does question contain any of ~40 tax keywords?     │                     ║
+║  │  (tax, irs, form, filing, visa, fica, opt, itin...) │                     ║
+║  └──────────────┬──────────────────────────────────────┘                     ║
+║                 │ No → "Not a tax question" — STOP                           ║
+║                 │ Yes ↓                                                      ║
 ║       ▼                                                                      ║
-║  ┌─────────────────────────────────────────────────────┐                    ║
-║  │  HYBRID RETRIEVAL  (retriever.py)                   │                    ║
-║  │                                                     │                    ║
-║  │  Query = question + visa type + country + tax year  │                    ║
-║  │                │                                    │                    ║
-║  │                ├──▶ Vector Search (ChromaDB, top 20)│                    ║
-║  │                │     semantic meaning match         │                    ║
-║  │                │                                    │                    ║
-║  │                ├──▶ BM25 Search (rank_bm25, top 20) │                    ║
-║  │                │     exact keyword match            │                    ║
-║  │                │                                    │                    ║
-║  │                └──▶ RRF Fusion: score = Σ 1/(60+rank)                   ║
-║  │                      best of both → Top 5 chunks    │                    ║
-║  └──────────────┬──────────────────────────────────────┘                    ║
+║  ┌─────────────────────────────────────────────────────┐                     ║
+║  │  HYBRID RETRIEVAL  (retriever.py)                   │                     ║
+║  │                                                     │                     ║
+║  │  Query = question + visa type + country + tax year  │                     ║
+║  │                │                                    │                     ║
+║  │                ├──▶ Vector Search (ChromaDB, top 20)│                     ║
+║  │                │     semantic meaning match         │                     ║
+║  │                │                                    │                     ║
+║  │                ├──▶ BM25 Search (rank_bm25, top 20) │                     ║
+║  │                │     exact keyword match            │                     ║
+║  │                │                                    │                     ║
+║  │                └──▶ RRF Fusion: score = Σ 1/(60+rank)                     ║
+║  │                      best of both → Top 5 chunks    │                     ║
+║  └──────────────┬──────────────────────────────────────┘                     ║
 ║                 │                                                            ║
 ║       ▼                                                                      ║
-║  ┌─────────────────────────────────────────────────────┐                    ║
-║  │  GUARD 2 — Confidence Threshold                     │                    ║
-║  │  Best vector similarity score ≥ 0.70?               │                    ║
-║  └──────────────┬──────────────────────────────────────┘                    ║
-║                 │ No → "Low confidence" — STOP                              ║
-║                 │ Yes ↓                                                     ║
+║  ┌─────────────────────────────────────────────────────┐                     ║
+║  │  GUARD 2 — Confidence Threshold                     │                     ║
+║  │  Best vector similarity score ≥ 0.70?               │                     ║
+║  └──────────────┬──────────────────────────────────────┘                     ║
+║                 │ No → "Low confidence" — STOP                               ║
+║                 │ Yes ↓                                                      ║
 ║       ▼                                                                      ║
-║  ┌─────────────────────────────────────────────────────┐                    ║
-║  │  LLM GENERATION — ask_gemini()                      │                    ║
-║  │                                                     │                    ║
-║  │  Prompt = student profile + top 5 chunks + question │                    ║
-║  │       │                                             │                    ║
-║  │       ├──▶ Try: Gemini 2.0 Flash API               │                    ║
-║  │       │         → generated answer                 │                    ║
-║  │       │                                             │                    ║
-║  │       └──▶ Fail: extractive_fallback()              │                    ║
-║  │               → top 2 raw chunks shown directly     │                    ║
-║  └──────────────┬──────────────────────────────────────┘                    ║
+║  ┌─────────────────────────────────────────────────────┐                     ║
+║  │  LLM GENERATION — ask_gemini()                      │                     ║
+║  │                                                     │                     ║
+║  │  Prompt = student profile + top 5 chunks + question │                     ║
+║  │       │                                             │                     ║
+║  │       ├──▶ Try: Gemini 2.0 Flash API               │                      ║
+║  │       │         → generated answer                 │                      ║
+║  │       │                                             │                     ║
+║  │       └──▶ Fail: extractive_fallback()              │                     ║
+║  │               → top 2 raw chunks shown directly     │                     ║
+║  └──────────────┬──────────────────────────────────────┘                     ║
 ║                 │                                                            ║
 ║       ▼                                                                      ║
-║  ┌─────────────────────────────────────────────────────┐                    ║
-║  │  OUTPUT + TRACKING                                  │                    ║
-║  │                                                     │                    ║
-║  │  Print answer                                       │                    ║
-║  │  Print: [Retrieval: Xs | LLM: Xs | ~N in/out tok]  │                    ║
-║  │  Ask:   "Was this helpful? (y/n)"                   │                    ║
-║  │  Save:  feedback_log.jsonl  (rating + question)     │                    ║
-║  │  Save:  query_log.jsonl     (latency + tokens)      │                    ║
-║  └─────────────────────────────────────────────────────┘                    ║
+║  ┌─────────────────────────────────────────────────────┐                     ║
+║  │  OUTPUT + TRACKING                                  │                     ║
+║  │                                                     │                     ║
+║  │  Print answer                                       │                     ║
+║  │  Print: [Retrieval: Xs | LLM: Xs | ~N in/out tok]  │                      ║
+║  │  Ask:   "Was this helpful? (y/n)"                   │                     ║
+║  │  Save:  feedback_log.jsonl  (rating + question)     │                     ║
+║  │  Save:  query_log.jsonl     (latency + tokens)      │                     ║
+║  └─────────────────────────────────────────────────────┘                     ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
                                     │
                                     │ (offline, run separately)
                                     ▼
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                        EVALUATION  (evaluate.py)                            ║
+║                        EVALUATION  (evaluate.py)                             ║
 ║                                                                              ║
 ║  10 test questions from ground_truth.json                                    ║
 ║       │                                                                      ║
