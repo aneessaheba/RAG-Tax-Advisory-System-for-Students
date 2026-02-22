@@ -149,6 +149,26 @@ if confidence < 0.70:
 
 ---
 
+### Feature 3 — LLM-as-a-Judge Evaluation
+
+Cosine similarity can't tell if an answer is actually correct — two texts can be similar in embedding space but factually wrong. LLM-as-a-Judge uses Gemini itself to score answer quality.
+
+**How it works (`evaluate.py`):**
+
+For each test question, after generating the answer, a second Gemini call scores it on 3 dimensions:
+
+| Dimension | What it checks |
+|-----------|---------------|
+| Correctness | Is the answer factually accurate for U.S. tax law? |
+| Completeness | Does it fully address the question? |
+| Groundedness | Is it based on the retrieved context (no hallucination)? |
+
+Each score is 0.0–1.0. The overall Judge score is their average.
+
+**Result:** Judge score = **0.770** — identified 2 weak answers that cosine metrics rated as acceptable but were actually vague or off-topic.
+
+---
+
 ## Tech Stack (All Free)
 
 | Component | Tool | Why |
