@@ -123,6 +123,32 @@ Query ──> BM25 Search   (top 20) ──┘
 
 ---
 
+### Feature 2 — Confidence Threshold + Refusal Policy
+
+The bot refuses to answer when it shouldn't — preventing hallucinations and off-topic responses.
+
+**Two-layer refusal (`app.py`):**
+
+| Layer | Check | What triggers refusal |
+|-------|-------|-----------------------|
+| 1 | Keyword filter | Question contains none of ~40 tax-related keywords |
+| 2 | Confidence threshold | Best vector similarity score < 0.70 |
+
+Layer 1 catches completely off-topic questions (e.g. "What's the weather?") before even hitting the database. Layer 2 catches tax-sounding questions where the database has no relevant documents.
+
+```python
+# Layer 1 — fast keyword check
+if not is_tax_question(question):
+    print("This doesn't appear to be a tax question.")
+
+# Layer 2 — retrieval confidence
+chunks, confidence = retriever.retrieve(query)
+if confidence < 0.70:
+    print(f"[Low confidence: {confidence:.2f}] Couldn't find reliable info.")
+```
+
+---
+
 ## Tech Stack (All Free)
 
 | Component | Tool | Why |
