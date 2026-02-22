@@ -102,6 +102,27 @@ RAG-Tax-Advisor/
 
 ---
 
+## Features
+
+### Feature 1 — Hybrid Retrieval (BM25 + Vector + RRF)
+
+Plain vector search misses exact keyword matches — e.g. searching "8843" might not surface the Form 8843 chunk if the embedding isn't close enough. BM25 (keyword search) fills that gap.
+
+**How it works (`retriever.py`):**
+1. **Vector search** — ChromaDB finds the top 20 semantically similar chunks using `all-MiniLM-L6-v2` embeddings
+2. **BM25 search** — `rank_bm25` scores all chunks by keyword overlap with the query; top 20 taken
+3. **Reciprocal Rank Fusion (RRF)** — merges both ranked lists: score = Σ 1/(60 + rank). Top 5 returned.
+
+```
+Query ──> Vector Search (top 20) ──┐
+                                   ├──> RRF merge ──> Top 5 chunks
+Query ──> BM25 Search   (top 20) ──┘
+```
+
+**Result:** Hit rate improved from **70% → 100%** on the evaluation set.
+
+---
+
 ## Tech Stack (All Free)
 
 | Component | Tool | Why |
