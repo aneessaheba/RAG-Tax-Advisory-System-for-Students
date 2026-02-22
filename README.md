@@ -1,28 +1,132 @@
 # RAG Tax Advisor for International Students
 
-A chatbot that helps international students in the U.S. understand their tax obligations. It uses **RAG** (Retrieval-Augmented Generation) — meaning it searches through real IRS publications, tax treaties, and university guides to give grounded answers instead of making things up.
+A chatbot that answers U.S. tax questions for international students. Instead of guessing, it searches through real IRS publications, tax treaties, and university guides, then uses Google Gemini (free) to explain the answer clearly — grounded in actual documents.
 
-
+**All free:** local embeddings, local vector database, free Gemini API tier.
 
 ---
 
-## How It Works
+## Full System Architecture
 
 ```
-PDF Documents ──> Extract Text ──> Clean ──> Chunk ──> Embed ──> Store in ChromaDB
-                                                                        │
-User asks a question ──> Embed question ──> Search ChromaDB ──> Top matches
-                                                                        │
-                              Student profile + matching docs + question │
-                                                                        ▼
-                                                              Gemini (free LLM)
-                                                                        │
-                                                                        ▼
-                                                                 Answer to user
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        DATA PIPELINE  (run once)                            ║
+║                                                                              ║
+║   41 PDFs                                                                    ║
+║   ├── IRS Publications  (Pub 519, 901, 970, 17)                              ║
+║   ├── IRS Forms         (1040-NR, 8843, 8233, W-8BEN, W-2, 1098-T)          ║
+║   ├── Tax Treaties      (India, China, Korea, Canada, 10+ countries)         ║
+║   └── University Guides (20+ guides from U.S. universities)                 ║
+║             │                                                                ║
+║             ▼  Step 1 — extract_pdfs_to_json.py  (PyMuPDF)                  ║
+║        Page-by-page text extracted → saved as JSON                           ║
+║             │                                                                ║
+║             ▼  Step 2 — clean_parsed_json.py                                 ║
+║        Fix hyphenated line breaks, normalize whitespace                      ║
+║             │                                                                ║
+║             ▼  Step 3 — split_clean_json_to_chunks.py                        ║
+║        Split into 500-word chunks with 100-word overlap → 2,247 chunks       ║
+║             │                                                                ║
+║             ▼  Step 4 — embed_chunks.py  (all-MiniLM-L6-v2, runs locally)   ║
+║        Each chunk → 384-dimensional vector                                   ║
+║             │                                                                ║
+║             ▼  Step 5 — upload_to_chromadb.py                                ║
+║        2,247 chunks + vectors stored in local ChromaDB                       ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+                                    │
+                                    │ (stored on disk, loaded at startup)
+                                    ▼
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          CHATBOT  (app.py)                                  ║
+║                                                                              ║
+║  Startup                                                                     ║
+║  ├── Load ChromaDB (2,247 chunks)                                            ║
+║  ├── Build BM25 index over all chunks (rank_bm25)                            ║
+║  └── Ask student 7 profile questions (visa, country, income, state, etc.)    ║
+║                                                                              ║
+║  For each question:                                                          ║
+║                                                                              ║
+║  Student types question                                                      ║
+║       │                                                                      ║
+║       ▼                                                                      ║
+║  ┌─────────────────────────────────────────────────────┐                    ║
+║  │  GUARD 1 — Keyword Filter                           │                    ║
+║  │  Does question contain any of ~40 tax keywords?     │                    ║
+║  │  (tax, irs, form, filing, visa, fica, opt, itin...) │                    ║
+║  └──────────────┬──────────────────────────────────────┘                    ║
+║                 │ No → "Not a tax question" — STOP                          ║
+║                 │ Yes ↓                                                     ║
+║       ▼                                                                      ║
+║  ┌─────────────────────────────────────────────────────┐                    ║
+║  │  HYBRID RETRIEVAL  (retriever.py)                   │                    ║
+║  │                                                     │                    ║
+║  │  Query = question + visa type + country + tax year  │                    ║
+║  │                │                                    │                    ║
+║  │                ├──▶ Vector Search (ChromaDB, top 20)│                    ║
+║  │                │     semantic meaning match         │                    ║
+║  │                │                                    │                    ║
+║  │                ├──▶ BM25 Search (rank_bm25, top 20) │                    ║
+║  │                │     exact keyword match            │                    ║
+║  │                │                                    │                    ║
+║  │                └──▶ RRF Fusion: score = Σ 1/(60+rank)                   ║
+║  │                      best of both → Top 5 chunks    │                    ║
+║  └──────────────┬──────────────────────────────────────┘                    ║
+║                 │                                                            ║
+║       ▼                                                                      ║
+║  ┌─────────────────────────────────────────────────────┐                    ║
+║  │  GUARD 2 — Confidence Threshold                     │                    ║
+║  │  Best vector similarity score ≥ 0.70?               │                    ║
+║  └──────────────┬──────────────────────────────────────┘                    ║
+║                 │ No → "Low confidence" — STOP                              ║
+║                 │ Yes ↓                                                     ║
+║       ▼                                                                      ║
+║  ┌─────────────────────────────────────────────────────┐                    ║
+║  │  LLM GENERATION — ask_gemini()                      │                    ║
+║  │                                                     │                    ║
+║  │  Prompt = student profile + top 5 chunks + question │                    ║
+║  │       │                                             │                    ║
+║  │       ├──▶ Try: Gemini 2.0 Flash API               │                    ║
+║  │       │         → generated answer                 │                    ║
+║  │       │                                             │                    ║
+║  │       └──▶ Fail: extractive_fallback()              │                    ║
+║  │               → top 2 raw chunks shown directly     │                    ║
+║  └──────────────┬──────────────────────────────────────┘                    ║
+║                 │                                                            ║
+║       ▼                                                                      ║
+║  ┌─────────────────────────────────────────────────────┐                    ║
+║  │  OUTPUT + TRACKING                                  │                    ║
+║  │                                                     │                    ║
+║  │  Print answer                                       │                    ║
+║  │  Print: [Retrieval: Xs | LLM: Xs | ~N in/out tok]  │                    ║
+║  │  Ask:   "Was this helpful? (y/n)"                   │                    ║
+║  │  Save:  feedback_log.jsonl  (rating + question)     │                    ║
+║  │  Save:  query_log.jsonl     (latency + tokens)      │                    ║
+║  └─────────────────────────────────────────────────────┘                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+                                    │
+                                    │ (offline, run separately)
+                                    ▼
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        EVALUATION  (evaluate.py)                            ║
+║                                                                              ║
+║  10 test questions from ground_truth.json                                    ║
+║       │                                                                      ║
+║       ▼  For each question:                                                  ║
+║  Hybrid retrieval → top 5 chunks                                             ║
+║       │                                                                      ║
+║       ▼                                                                      ║
+║  Gemini generates answer                                                     ║
+║       │                                                                      ║
+║       ├──▶ Context Relevance  — cosine(question, chunks)                     ║
+║       ├──▶ Hit Rate           — do chunks contain expected keywords?         ║
+║       ├──▶ Answer Relevance   — cosine(question, answer)                     ║
+║       ├──▶ Faithfulness       — cosine(answer, avg chunks)                   ║
+║       └──▶ LLM Judge          — Gemini scores correctness +                  ║
+║                                  completeness + groundedness (0–1 each)      ║
+║                                                                              ║
+║  Results saved to evaluation_results.json                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 ```
-
-1. **Data pipeline** (run once): Extracts text from ~40 tax PDFs, cleans it, splits into small chunks, embeds each chunk into a vector, and stores everything in a local vector database (ChromaDB).
-2. **Chat app**: Asks the student a few profile questions (visa type, country, income, etc.), then for each tax question, searches the database for the most relevant chunks and sends them along with the question to Google Gemini (free) to generate an answer.
 
 ---
 
