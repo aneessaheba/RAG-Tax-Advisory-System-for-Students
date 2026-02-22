@@ -1,13 +1,15 @@
 """
 Tax Advisor Bot for International Students
 Uses RAG (ChromaDB + sentence-transformers) + Google Gemini free API
+
+Retrieval: Hybrid (vector + BM25) with Reciprocal Rank Fusion
 """
 import os
 import json
 from dotenv import load_dotenv
 import chromadb
-from sentence_transformers import SentenceTransformer
 from google import genai
+from retriever import HybridRetriever
 
 load_dotenv()  # loads GEMINI_API_KEY from .env file
 
@@ -15,8 +17,7 @@ load_dotenv()  # loads GEMINI_API_KEY from .env file
 BASE_DIR = os.path.dirname(__file__)
 CHROMA_DIR = os.path.join(BASE_DIR, 'tax_rag_data', 'data_work', 'chroma_db')
 COLLECTION_NAME = "tax_docs"
-EMBED_MODEL = "all-MiniLM-L6-v2"
-TOP_K = 5  # number of chunks to retrieve
+TOP_K = 5
 
 
 def get_student_info():
@@ -25,11 +26,8 @@ def get_student_info():
     print("I'll ask a few questions to give you the right tax advice.\n")
 
     visa_type = input("1. What is your visa type? (F-1 / J-1 / M-1 / Other): ").strip() or "F-1"
-
     home_country = input("2. What is your home country?: ").strip() or "India"
-
     first_year = input("3. What year did you first enter the U.S.?: ").strip() or "2023"
-
     tax_year = input("4. What tax year are you filing for? (e.g. 2024): ").strip() or "2024"
 
     print("5. What types of income did you have? (comma-separated)")
@@ -38,7 +36,6 @@ def get_student_info():
     income_types = [x.strip() for x in income_raw.split(",")]
 
     state = input("6. What U.S. state do you live in?: ").strip() or "CA"
-
     has_ssn = input("7. Do you have an SSN or ITIN? (yes/no): ").strip().lower()
     has_ssn = has_ssn in ("yes", "y")
 
@@ -54,7 +51,7 @@ def get_student_info():
 
 
 def build_query(student_info, question):
-    """Build a search query from student info + their question."""
+    """Enrich the query with student profile context for better retrieval."""
     parts = [
         question,
         f"{student_info['visa_type']} student",
@@ -66,25 +63,21 @@ def build_query(student_info, question):
     return " ".join(parts)
 
 
-def retrieve_context(collection, model, query, top_k=TOP_K):
-    """Search ChromaDB for relevant tax document chunks."""
-    query_embedding = model.encode(query).tolist()
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=top_k,
-        include=["documents", "metadatas"],
-    )
-    chunks = []
-    for doc, meta in zip(results['documents'][0], results['metadatas'][0]):
+def format_context(chunks):
+    """Format retrieved chunks into a readable context string."""
+    parts = []
+    for c in chunks:
+        meta = c["metadata"]
         source = f"[{meta.get('title', 'Unknown')} - p.{meta.get('page_number', '?')}]"
-        chunks.append(f"{source}\n{doc}")
-    return "\n\n---\n\n".join(chunks)
+        parts.append(f"{source}\n{c['text']}")
+    return "\n\n---\n\n".join(parts)
 
 
 def ask_gemini(student_info, context, question):
-    """Send the question + context to Gemini free API."""
-    system_prompt = f"""You are a helpful tax advisor for international students in the U.S.
-The student's profile:
+    """Send the question + context to Gemini."""
+    prompt = f"""You are a helpful tax advisor for international students in the U.S.
+
+Student profile:
 - Visa: {student_info['visa_type']}
 - Home country: {student_info['home_country']}
 - First U.S. entry: {student_info['first_entry_year']}
@@ -95,9 +88,6 @@ The student's profile:
 
 Use ONLY the provided reference documents to answer. If the documents don't cover something,
 say so clearly. Always remind the student this is general guidance, not professional tax advice.
-Keep answers clear, concise, and actionable."""
-
-    prompt = f"""{system_prompt}
 
 --- REFERENCE DOCUMENTS ---
 {context}
@@ -113,31 +103,24 @@ Provide a clear, helpful answer:"""
 
 
 def main():
-    # Check for Gemini API key
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        print("ERROR: Set GEMINI_API_KEY environment variable.")
+        print("ERROR: Set GEMINI_API_KEY in .env")
         print("Get a free key at: https://aistudio.google.com/apikey")
         return
-
-    # Load models and DB
-    print("Loading embedding model...")
-    embed_model = SentenceTransformer(EMBED_MODEL)
 
     print("Connecting to ChromaDB...")
     client = chromadb.PersistentClient(path=CHROMA_DIR)
     collection = client.get_collection(name=COLLECTION_NAME)
-    print(f"Loaded {collection.count()} document chunks.\n")
 
-    # Get student info
+    print("Building hybrid retriever (vector + BM25)...")
+    retriever = HybridRetriever(collection)
+
     student_info = get_student_info()
 
-    # Save profile for reference
-    profile_path = os.path.join(BASE_DIR, "user_profile.json")
-    with open(profile_path, 'w') as f:
+    with open(os.path.join(BASE_DIR, "user_profile.json"), 'w') as f:
         json.dump(student_info, f, indent=2)
 
-    # Chat loop
     print("\n=== Ready! Ask your tax questions (type 'quit' to exit) ===\n")
 
     while True:
@@ -146,10 +129,11 @@ def main():
             print("Goodbye! Remember: consult a tax professional for specific advice.")
             break
 
-        # Build search query, retrieve context, ask LLM
         query = build_query(student_info, question)
-        print("Searching tax documents...")
-        context = retrieve_context(collection, embed_model, query)
+        print("Searching tax documents (hybrid)...")
+        chunks, confidence = retriever.retrieve(query, top_k=TOP_K)
+        context = format_context(chunks)
+
         print("Generating answer...\n")
         answer = ask_gemini(student_info, context, question)
         print(f"\n{answer}\n")

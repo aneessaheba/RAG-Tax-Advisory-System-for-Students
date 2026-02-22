@@ -145,6 +145,70 @@ python app.py
 
 ---
 
+## Evaluation Results
+
+Evaluated on 10 international student tax questions across 4 metrics (0.0–1.0, higher is better).
+
+### v1 — Vector-only retrieval (baseline)
+
+**Setup:** `all-MiniLM-L6-v2` embeddings · `gemini-2.0-flash` · Top-5 vector search · 2,247 chunks from 41 PDFs
+
+| # | Question | Ctx Rel | Hit | Ans Rel | Faith |
+|---|----------|---------|-----|---------|-------|
+| 1 | Do F-1 students need to file Form 8843? | 0.610 | ❌ | 0.624 | 0.727 |
+| 2 | Can nonresident aliens claim the standard deduction? | 0.543 | ✅ | 0.757 | 0.758 |
+| 3 | What tax return form do nonresident aliens file? | 0.690 | ✅ | 0.797 | 0.770 |
+| 4 | Are F-1 students exempt from FICA taxes? | 0.611 | ✅ | 0.866 | 0.811 |
+| 5 | What is the substantial presence test? | 0.498 | ✅ | 0.605 | 0.872 |
+| 6 | Does the US-India tax treaty benefit students? | 0.600 | ✅ | 0.487 | 0.682 |
+| 7 | What is Form 1098-T used for? | 0.621 | ✅ | 0.784 | 0.868 |
+| 8 | Do international students on OPT need to pay taxes? | 0.637 | ❌ | 0.707 | 0.707 |
+| 9 | What is Form W-8BEN used for? | 0.395 | ✅ | 0.797 | 0.752 |
+| 10 | When is the tax filing deadline for nonresident aliens? | 0.637 | ❌ | 0.504 | 0.433 |
+| | **AVERAGE** | **0.584** | **0.70** | **0.693** | **0.738** |
+
+### v2 — Hybrid retrieval (vector + BM25 + RRF)
+
+**Setup:** Same as v1 but retrieval upgraded to hybrid: vector search + BM25 keyword search merged with Reciprocal Rank Fusion
+
+| # | Question | Ctx Rel | Hit | Ans Rel | Faith |
+|---|----------|---------|-----|---------|-------|
+| 1 | Do F-1 students need to file Form 8843? | 0.560 | ✅ | 0.864 | 0.707 |
+| 2 | Can nonresident aliens claim the standard deduction? | 0.518 | ✅ | 0.806 | 0.654 |
+| 3 | What tax return form do nonresident aliens file? | 0.666 | ✅ | 0.802 | 0.698 |
+| 4 | Are F-1 students exempt from FICA taxes? | 0.611 | ✅ | 0.841 | 0.797 |
+| 5 | What is the substantial presence test? | 0.457 | ✅ | 0.605 | 0.884 |
+| 6 | Does the US-India tax treaty benefit students? | 0.547 | ✅ | 0.794 | 0.655 |
+| 7 | What is Form 1098-T used for? | 0.585 | ✅ | 0.784 | 0.849 |
+| 8 | Do international students on OPT need to pay taxes? | 0.602 | ✅ | 0.565 | 0.511 |
+| 9 | What is Form W-8BEN used for? | 0.363 | ✅ | 0.774 | 0.722 |
+| 10 | When is the tax filing deadline for nonresident aliens? | 0.582 | ✅ | 0.569 | 0.514 |
+| | **AVERAGE** | **0.549** | **1.00** | **0.740** | **0.699** |
+
+### v1 → v2 Comparison
+
+| Metric | v1 (vector only) | v2 (hybrid) | Change |
+|--------|-----------------|-------------|--------|
+| Context Relevance | 0.584 | 0.549 | -0.035 |
+| **Hit Rate** | **0.70** | **1.00** | **+0.30 ✅** |
+| **Answer Relevance** | **0.693** | **0.740** | **+0.047 ✅** |
+| Faithfulness | 0.738 | 0.699 | -0.039 |
+
+**Key improvement:** Hit rate jumped from 70% → **100%** — BM25 catches exact form names and tax terms (like "8843", "FICA", "OPT") that vector search can miss. Answer relevance also improved as a result of retrieving more precise chunks.
+
+**Trade-off:** Context relevance and faithfulness dropped slightly because BM25 sometimes surfaces chunks that are keyword-relevant but less semantically coherent — an expected trade-off with hybrid retrieval.
+
+### Metric Definitions
+
+| Metric | What it measures |
+|--------|-----------------|
+| **Context Relevance** | Cosine similarity between the question and retrieved chunks — are we fetching the right docs? |
+| **Hit Rate** | Did retrieved chunks collectively contain all expected answer keywords? |
+| **Answer Relevance** | Cosine similarity between the question and the generated answer — does it address what was asked? |
+| **Faithfulness** | Cosine similarity between the generated answer and retrieved context — is the answer grounded? |
+
+---
+
 ## Unused/Legacy Scripts
 
 These files in `tax_rag_data/` are from an earlier version and are **not used** by the current pipeline:

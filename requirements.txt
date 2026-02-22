@@ -4,3 +4,4 @@ chromadb
 google-genai
 python-dotenv
 numpy
+rank_bm25

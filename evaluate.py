@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 import chromadb
 from google import genai
+from retriever import HybridRetriever
 
 load_dotenv()
 
@@ -32,14 +33,15 @@ def cosine_similarity(a, b):
     return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
 
-def context_relevance(query_embedding, chunk_embeddings):
+def context_relevance(query_embedding, chunk_texts, embed_model):
     """Average cosine similarity between the query and each retrieved chunk."""
+    chunk_embeddings = embed_model.encode(chunk_texts)
     scores = [cosine_similarity(query_embedding, ce) for ce in chunk_embeddings]
     return round(float(np.mean(scores)), 4)
 
 
 def hit_rate(chunk_texts, expected_keywords):
-    """1.0 if any chunk contains all expected keywords (case-insensitive), else 0.0."""
+    """1.0 if retrieved chunks collectively contain all expected keywords."""
     joined = " ".join(chunk_texts).lower()
     hit = all(kw.lower() in joined for kw in expected_keywords)
     return 1.0 if hit else 0.0
@@ -50,15 +52,16 @@ def answer_relevance(question_embedding, answer_embedding):
     return round(cosine_similarity(question_embedding, answer_embedding), 4)
 
 
-def faithfulness(answer_embedding, chunk_embeddings):
+def faithfulness(answer_embedding, chunk_texts, embed_model):
     """Cosine similarity between the answer and the average context embedding."""
+    chunk_embeddings = embed_model.encode(chunk_texts)
     avg_context = np.mean(chunk_embeddings, axis=0)
     return round(cosine_similarity(answer_embedding, avg_context), 4)
 
 
-def generate_answer(question, chunks, api_key, model_name="gemini-2.0-flash"):
+def generate_answer(question, chunk_texts, api_key, model_name="gemini-2.0-flash"):
     """Call Gemini to generate an answer grounded in the retrieved chunks."""
-    context = "\n\n".join(chunks)
+    context = "\n\n".join(chunk_texts)
     prompt = f"""You are a tax advisor for international students.
 Answer the question using ONLY the context below. Be concise.
 
@@ -82,8 +85,11 @@ def main():
     embed_model = SentenceTransformer(EMBED_MODEL)
 
     print("Connecting to ChromaDB...")
-    client = chromadb.PersistentClient(path=CHROMA_DIR)
-    collection = client.get_collection(name=COLLECTION_NAME)
+    db_client = chromadb.PersistentClient(path=CHROMA_DIR)
+    collection = db_client.get_collection(name=COLLECTION_NAME)
+
+    print("Building hybrid retriever...")
+    retriever = HybridRetriever(collection)
 
     with open(GROUND_TRUTH_PATH, 'r') as f:
         test_cases = json.load(f)
@@ -99,29 +105,22 @@ def main():
         question = tc["question"]
         expected_keywords = tc["expected_keywords"]
 
-        # Embed the question
         q_embedding = embed_model.encode(question).tolist()
 
-        # Retrieve top K chunks
-        retrieved = collection.query(
-            query_embeddings=[q_embedding],
-            n_results=TOP_K,
-            include=["documents", "embeddings"],
-        )
-        chunk_texts = retrieved["documents"][0]
-        chunk_embeddings = retrieved["embeddings"][0]
+        # Hybrid retrieval
+        chunks, _ = retriever.retrieve(question, top_k=TOP_K)
+        chunk_texts = [c["text"] for c in chunks]
 
         # Generate answer
         answer = generate_answer(question, chunk_texts, api_key)
         answer_embedding = embed_model.encode(answer).tolist()
 
         # Compute metrics
-        m_context_relevance = context_relevance(q_embedding, chunk_embeddings)
+        m_context_relevance = context_relevance(q_embedding, chunk_texts, embed_model)
         m_hit_rate = hit_rate(chunk_texts, expected_keywords)
         m_answer_relevance = answer_relevance(q_embedding, answer_embedding)
-        m_faithfulness = faithfulness(answer_embedding, chunk_embeddings)
+        m_faithfulness = faithfulness(answer_embedding, chunk_texts, embed_model)
 
-        # Store result
         result = {
             "question": question,
             "expected_keywords": expected_keywords,
@@ -138,19 +137,17 @@ def main():
         for k in totals:
             totals[k] += result["metrics"][k]
 
-        # Print row
         short_q = question[:53] + ".." if len(question) > 53 else question
         print(f"{i+1:<4} {short_q:<55} {m_context_relevance:>7.3f} {int(m_hit_rate):>5} {m_answer_relevance:>7.3f} {m_faithfulness:>7.3f}")
 
-    # Averages
     n = len(test_cases)
     averages = {k: round(v / n, 4) for k, v in totals.items()}
 
     print("-" * 90)
     print(f"{'AVERAGE':<59} {averages['context_relevance']:>7.3f} {averages['hit_rate']:>5.2f} {averages['answer_relevance']:>7.3f} {averages['faithfulness']:>7.3f}")
 
-    # Save results
     output = {
+        "retrieval": "hybrid (vector + BM25 + RRF)",
         "model": EMBED_MODEL,
         "llm": "gemini-2.0-flash",
         "top_k": TOP_K,
