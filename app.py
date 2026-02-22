@@ -21,6 +21,7 @@ load_dotenv()  # loads GEMINI_API_KEY from .env file
 BASE_DIR = os.path.dirname(__file__)
 CHROMA_DIR = os.path.join(BASE_DIR, 'tax_rag_data', 'data_work', 'chroma_db')
 QUERY_LOG_PATH = os.path.join(BASE_DIR, 'query_log.jsonl')
+FEEDBACK_LOG_PATH = os.path.join(BASE_DIR, 'feedback_log.jsonl')
 COLLECTION_NAME = "tax_docs"
 TOP_K = 5
 CONFIDENCE_THRESHOLD = 0.70  # vector similarity floor for tax questions
@@ -45,6 +46,26 @@ def estimate_tokens(text):
 def log_query(entry):
     """Append one query's stats as a JSON line to query_log.jsonl."""
     with open(QUERY_LOG_PATH, 'a') as f:
+        f.write(json.dumps(entry) + "\n")
+
+
+def collect_feedback(question, answer):
+    """Ask the user to rate the answer and save to feedback_log.jsonl."""
+    rating_input = input("Was this helpful? (y/n, or press Enter to skip): ").strip().lower()
+    if rating_input not in ("y", "n"):
+        return  # skipped
+
+    rating = 1 if rating_input == "y" else 0
+    label = "👍 Helpful" if rating == 1 else "👎 Not helpful"
+    print(f"  Feedback recorded: {label}")
+
+    entry = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "question": question,
+        "answer_snippet": answer[:200],
+        "rating": rating,
+    }
+    with open(FEEDBACK_LOG_PATH, 'a') as f:
         f.write(json.dumps(entry) + "\n")
 
 
@@ -202,6 +223,8 @@ def main():
         print(f"\n{answer}\n")
         print(f"[Retrieval: {retrieval_latency}s | LLM: {llm_latency}s | Total: {total_latency}s | "
               f"~{input_tokens} in / {output_tokens} out tokens]")
+
+        collect_feedback(question, answer)
         print("-" * 60)
 
         # Log this query's stats
