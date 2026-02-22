@@ -218,6 +218,36 @@ Pressing Enter skips without recording. Rating `1` = helpful, `0` = not helpful.
 
 ---
 
+### Feature 6 — Model Fallback
+
+If the Gemini API fails (rate limit, network error, expired key), the bot doesn't crash — it falls back to showing the top 2 retrieved source chunks directly so the user still gets useful information.
+
+**Normal flow:**
+```
+[Confidence: 0.84] Generating answer...
+
+Yes, as an F-1 student you must file Form 8843...
+
+[Retrieval: 0.12s | LLM: 2.34s | Total: 2.46s | ~1823 in / 142 out tokens]
+```
+
+**Fallback flow (Gemini unavailable):**
+```
+[Confidence: 0.84] Generating answer...
+  [Gemini error: 429 Resource exhausted]
+
+[Gemini unavailable — showing raw source excerpts instead]
+
+Source 1: IRS Form 8843 Instructions (p.1)
+All foreign nationals present in the U.S. on an F, J, M, or Q visa...
+
+[Retrieval: 0.12s | LLM: 0.01s | Total: 0.13s | fallback]
+```
+
+No extra dependencies — the fallback uses already-retrieved chunks, requiring zero additional API calls.
+
+---
+
 ## Tech Stack (All Free)
 
 | Component | Tool | Why |
