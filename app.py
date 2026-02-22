@@ -128,8 +128,26 @@ def format_context(chunks):
     return "\n\n---\n\n".join(parts)
 
 
-def ask_gemini(student_info, context, question):
-    """Send the question + context to Gemini. Returns (answer, latency_s, input_tokens, output_tokens)."""
+def extractive_fallback(chunks):
+    """
+    Fallback when Gemini is unavailable.
+    Returns the top 2 retrieved chunks as plain text so the user still gets useful info.
+    """
+    lines = ["[Gemini unavailable — showing raw source excerpts instead]\n"]
+    for i, c in enumerate(chunks[:2], 1):
+        meta = c["metadata"]
+        source = f"{meta.get('title', 'Unknown')} (p.{meta.get('page_number', '?')})"
+        lines.append(f"Source {i}: {source}\n{c['text'].strip()}")
+    lines.append("\nNote: This is general guidance, not professional tax advice.")
+    return "\n\n".join(lines)
+
+
+def ask_gemini(student_info, context, question, chunks):
+    """
+    Send the question + context to Gemini.
+    If Gemini fails for any reason, falls back to extractive_fallback().
+    Returns (answer, latency_s, input_tokens, output_tokens, used_fallback).
+    """
     prompt = f"""You are a helpful tax advisor for international students in the U.S.
 
 Student profile:
@@ -152,17 +170,18 @@ Student's question: {question}
 
 Provide a clear, helpful answer:"""
 
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-
     t0 = time.time()
-    response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
-    latency = round(time.time() - t0, 2)
-
-    answer = response.text
-    input_tokens = estimate_tokens(prompt)
-    output_tokens = estimate_tokens(answer)
-
-    return answer, latency, input_tokens, output_tokens
+    try:
+        client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+        response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+        latency = round(time.time() - t0, 2)
+        answer = response.text
+        return answer, latency, estimate_tokens(prompt), estimate_tokens(answer), False
+    except Exception as e:
+        latency = round(time.time() - t0, 2)
+        print(f"  [Gemini error: {e}]")
+        answer = extractive_fallback(chunks)
+        return answer, latency, 0, 0, True
 
 
 def main():
@@ -217,12 +236,14 @@ def main():
         context = format_context(chunks)
         print(f"[Confidence: {confidence:.2f}] Generating answer...\n")
 
-        answer, llm_latency, input_tokens, output_tokens = ask_gemini(student_info, context, question)
+        answer, llm_latency, input_tokens, output_tokens, used_fallback = ask_gemini(
+            student_info, context, question, chunks
+        )
         total_latency = round(retrieval_latency + llm_latency, 2)
 
         print(f"\n{answer}\n")
-        print(f"[Retrieval: {retrieval_latency}s | LLM: {llm_latency}s | Total: {total_latency}s | "
-              f"~{input_tokens} in / {output_tokens} out tokens]")
+        mode = "fallback" if used_fallback else f"~{input_tokens} in / {output_tokens} out tokens"
+        print(f"[Retrieval: {retrieval_latency}s | LLM: {llm_latency}s | Total: {total_latency}s | {mode}]")
 
         collect_feedback(question, answer)
         print("-" * 60)
@@ -237,6 +258,7 @@ def main():
             "total_latency_s": total_latency,
             "input_tokens_est": input_tokens,
             "output_tokens_est": output_tokens,
+            "used_fallback": used_fallback,
         })
 
 
