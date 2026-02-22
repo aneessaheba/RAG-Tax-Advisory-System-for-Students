@@ -3,6 +3,7 @@ Tax Advisor Bot for International Students
 Uses RAG (ChromaDB + sentence-transformers) + Google Gemini free API
 
 Retrieval: Hybrid (vector + BM25) with Reciprocal Rank Fusion
+Guardrail: Confidence threshold — refuses to answer if retrieval score is too low
 """
 import os
 import json
@@ -18,6 +19,18 @@ BASE_DIR = os.path.dirname(__file__)
 CHROMA_DIR = os.path.join(BASE_DIR, 'tax_rag_data', 'data_work', 'chroma_db')
 COLLECTION_NAME = "tax_docs"
 TOP_K = 5
+CONFIDENCE_THRESHOLD = 0.70  # vector similarity floor for tax questions
+
+# Must contain at least one of these for the question to be considered tax-related
+TAX_KEYWORDS = {
+    "tax", "taxes", "form", "irs", "filing", "file", "income", "deduction",
+    "refund", "w-2", "w2", "1040", "8843", "8233", "1098", "withholding",
+    "treaty", "visa", "f-1", "f1", "j-1", "j1", "opt", "cpt", "fica",
+    "ssn", "itin", "scholarship", "stipend", "wage", "wages", "salary",
+    "resident", "nonresident", "return", "credit", "exemption", "alien",
+    "substantial", "presence", "deadline", "april", "extension", "state",
+    "federal", "social security", "medicare", "fellowship", "tuition",
+}
 
 
 def get_student_info():
@@ -48,6 +61,12 @@ def get_student_info():
         "state": state,
         "has_ssn_or_itin": has_ssn,
     }
+
+
+def is_tax_question(question):
+    """Return True if the question contains at least one tax-related keyword."""
+    q_lower = question.lower()
+    return any(kw in q_lower for kw in TAX_KEYWORDS)
 
 
 def build_query(student_info, question):
@@ -129,12 +148,27 @@ def main():
             print("Goodbye! Remember: consult a tax professional for specific advice.")
             break
 
+        # Refusal check 1: keyword filter — is this even a tax question?
+        if not is_tax_question(question):
+            print("\nThis question doesn't appear to be tax-related. I can only help with "
+                  "U.S. tax questions for international students.\n")
+            print("-" * 60)
+            continue
+
         query = build_query(student_info, question)
         print("Searching tax documents (hybrid)...")
         chunks, confidence = retriever.retrieve(query, top_k=TOP_K)
-        context = format_context(chunks)
 
-        print("Generating answer...\n")
+        # Refusal check 2: confidence threshold — did we find relevant docs?
+        if confidence < CONFIDENCE_THRESHOLD:
+            print(f"\n[Low confidence: {confidence:.2f}] I couldn't find reliable information "
+                  f"in my tax documents to answer that.\n"
+                  f"Try rephrasing, or consult a tax professional or irs.gov.\n")
+            print("-" * 60)
+            continue
+
+        context = format_context(chunks)
+        print(f"[Confidence: {confidence:.2f}] Generating answer...\n")
         answer = ask_gemini(student_info, context, question)
         print(f"\n{answer}\n")
         print("-" * 60)
