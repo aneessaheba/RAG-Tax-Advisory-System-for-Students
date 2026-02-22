@@ -13,3 +13,7 @@ tax_rag_data/data_work/chunks/*
 tax_rag_data/data_work/embedded_chunks/*
 tax_rag_data/data_work/chroma_db/*
 !tax_rag_data/data_work/**/.gitkeep
+
+# Runtime logs (generated when app runs)
+query_log.jsonl
+evaluation_results.json

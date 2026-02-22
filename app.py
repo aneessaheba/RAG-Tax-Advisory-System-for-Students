@@ -4,9 +4,12 @@ Uses RAG (ChromaDB + sentence-transformers) + Google Gemini free API
 
 Retrieval: Hybrid (vector + BM25) with Reciprocal Rank Fusion
 Guardrail: Confidence threshold — refuses to answer if retrieval score is too low
+Tracking: Latency (retrieval + LLM) and token estimates logged to query_log.jsonl
 """
 import os
 import json
+import time
+from datetime import datetime
 from dotenv import load_dotenv
 import chromadb
 from google import genai
@@ -17,6 +20,7 @@ load_dotenv()  # loads GEMINI_API_KEY from .env file
 # --- Config ---
 BASE_DIR = os.path.dirname(__file__)
 CHROMA_DIR = os.path.join(BASE_DIR, 'tax_rag_data', 'data_work', 'chroma_db')
+QUERY_LOG_PATH = os.path.join(BASE_DIR, 'query_log.jsonl')
 COLLECTION_NAME = "tax_docs"
 TOP_K = 5
 CONFIDENCE_THRESHOLD = 0.70  # vector similarity floor for tax questions
@@ -31,6 +35,17 @@ TAX_KEYWORDS = {
     "substantial", "presence", "deadline", "april", "extension", "state",
     "federal", "social security", "medicare", "fellowship", "tuition",
 }
+
+
+def estimate_tokens(text):
+    """Rough token estimate: ~1 token per 4 characters (standard approximation)."""
+    return len(text) // 4
+
+
+def log_query(entry):
+    """Append one query's stats as a JSON line to query_log.jsonl."""
+    with open(QUERY_LOG_PATH, 'a') as f:
+        f.write(json.dumps(entry) + "\n")
 
 
 def get_student_info():
@@ -93,7 +108,7 @@ def format_context(chunks):
 
 
 def ask_gemini(student_info, context, question):
-    """Send the question + context to Gemini."""
+    """Send the question + context to Gemini. Returns (answer, latency_s, input_tokens, output_tokens)."""
     prompt = f"""You are a helpful tax advisor for international students in the U.S.
 
 Student profile:
@@ -117,8 +132,16 @@ Student's question: {question}
 Provide a clear, helpful answer:"""
 
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+
+    t0 = time.time()
     response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
-    return response.text
+    latency = round(time.time() - t0, 2)
+
+    answer = response.text
+    input_tokens = estimate_tokens(prompt)
+    output_tokens = estimate_tokens(answer)
+
+    return answer, latency, input_tokens, output_tokens
 
 
 def main():
@@ -156,8 +179,11 @@ def main():
             continue
 
         query = build_query(student_info, question)
+
+        t_retrieval_start = time.time()
         print("Searching tax documents (hybrid)...")
         chunks, confidence = retriever.retrieve(query, top_k=TOP_K)
+        retrieval_latency = round(time.time() - t_retrieval_start, 2)
 
         # Refusal check 2: confidence threshold — did we find relevant docs?
         if confidence < CONFIDENCE_THRESHOLD:
@@ -169,9 +195,26 @@ def main():
 
         context = format_context(chunks)
         print(f"[Confidence: {confidence:.2f}] Generating answer...\n")
-        answer = ask_gemini(student_info, context, question)
+
+        answer, llm_latency, input_tokens, output_tokens = ask_gemini(student_info, context, question)
+        total_latency = round(retrieval_latency + llm_latency, 2)
+
         print(f"\n{answer}\n")
+        print(f"[Retrieval: {retrieval_latency}s | LLM: {llm_latency}s | Total: {total_latency}s | "
+              f"~{input_tokens} in / {output_tokens} out tokens]")
         print("-" * 60)
+
+        # Log this query's stats
+        log_query({
+            "timestamp": datetime.utcnow().isoformat(),
+            "question": question,
+            "confidence": round(confidence, 4),
+            "retrieval_latency_s": retrieval_latency,
+            "llm_latency_s": llm_latency,
+            "total_latency_s": total_latency,
+            "input_tokens_est": input_tokens,
+            "output_tokens_est": output_tokens,
+        })
 
 
 if __name__ == "__main__":
