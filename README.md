@@ -147,7 +147,7 @@ python app.py
 
 ## Evaluation Results
 
-Evaluated on 10 international student tax questions across 4 metrics (0.0–1.0, higher is better).
+Evaluated on 10 international student tax questions across 5 metrics (0.0–1.0, higher is better).
 
 ### v1 — Vector-only retrieval (baseline)
 
@@ -185,18 +185,39 @@ Evaluated on 10 international student tax questions across 4 metrics (0.0–1.0,
 | 10 | When is the tax filing deadline for nonresident aliens? | 0.582 | ✅ | 0.569 | 0.514 |
 | | **AVERAGE** | **0.549** | **1.00** | **0.740** | **0.699** |
 
-### v1 → v2 Comparison
+### v3 — LLM-as-a-Judge added
 
-| Metric | v1 (vector only) | v2 (hybrid) | Change |
-|--------|-----------------|-------------|--------|
-| Context Relevance | 0.584 | 0.549 | -0.035 |
-| **Hit Rate** | **0.70** | **1.00** | **+0.30 ✅** |
-| **Answer Relevance** | **0.693** | **0.740** | **+0.047 ✅** |
-| Faithfulness | 0.738 | 0.699 | -0.039 |
+**Setup:** Same as v2 + Gemini now also rates each answer on correctness, completeness, and groundedness (0–1 each), averaged into a single Judge score.
 
-**Key improvement:** Hit rate jumped from 70% → **100%** — BM25 catches exact form names and tax terms (like "8843", "FICA", "OPT") that vector search can miss. Answer relevance also improved as a result of retrieving more precise chunks.
+| # | Question | Ctx Rel | Hit | Ans Rel | Faith | Judge |
+|---|----------|---------|-----|---------|-------|-------|
+| 1 | Do F-1 students need to file Form 8843? | 0.560 | ✅ | 0.864 | 0.707 | 1.000 |
+| 2 | Can nonresident aliens claim the standard deduction? | 0.518 | ✅ | 0.818 | 0.671 | 1.000 |
+| 3 | What tax return form do nonresident aliens file? | 0.666 | ✅ | 0.802 | 0.698 | 1.000 |
+| 4 | Are F-1 students exempt from FICA taxes? | 0.611 | ✅ | 0.867 | 0.790 | 0.700 |
+| 5 | What is the substantial presence test? | 0.457 | ✅ | 0.597 | 0.882 | 1.000 |
+| 6 | Does the US-India tax treaty benefit students? | 0.547 | ✅ | 0.668 | 0.550 | 0.000 |
+| 7 | What is Form 1098-T used for? | 0.585 | ✅ | 0.792 | 0.874 | 1.000 |
+| 8 | Do international students on OPT need to pay taxes? | 0.602 | ✅ | 0.493 | 0.406 | 0.000 |
+| 9 | What is Form W-8BEN used for? | 0.363 | ✅ | 0.863 | 0.668 | 1.000 |
+| 10 | When is the tax filing deadline for nonresident aliens? | 0.582 | ✅ | 0.528 | 0.595 | 1.000 |
+| | **AVERAGE** | **0.549** | **1.00** | **0.729** | **0.684** | **0.770** |
 
-**Trade-off:** Context relevance and faithfulness dropped slightly because BM25 sometimes surfaces chunks that are keyword-relevant but less semantically coherent — an expected trade-off with hybrid retrieval.
+**LLM Judge findings:** 7 of 10 answers scored 1.0, identifying two weak answers — Q6 (India treaty answer too vague to be actionable) and Q8 (OPT answer referenced tax software instead of explaining the tax obligation directly). Cosine similarity alone would not have caught these gaps.
+
+### v1 → v2 → v3 Comparison
+
+| Metric | v1 (vector) | v2 (hybrid) | v3 (+ LLM Judge) | Change v1→v3 |
+|--------|------------|-------------|-----------------|-------------|
+| Context Relevance | 0.584 | 0.549 | 0.549 | -0.035 |
+| **Hit Rate** | **0.70** | **1.00** | **1.00** | **+0.30 ✅** |
+| **Answer Relevance** | **0.693** | **0.740** | **0.729** | **+0.036 ✅** |
+| Faithfulness | 0.738 | 0.699 | 0.684 | -0.054 |
+| **LLM Judge** | — | — | **0.770** | **new ✅** |
+
+**Key improvement (v1→v2):** Hit rate jumped from 70% → **100%** — BM25 catches exact form names and tax terms (like "8843", "FICA", "OPT") that vector search can miss.
+
+**Key improvement (v2→v3):** LLM-as-a-Judge adds a human-like quality signal. It identified two answers that cosine metrics rated as acceptable but were actually weak or off-topic — a gap that embedding similarity can't detect.
 
 ### Metric Definitions
 
@@ -206,6 +227,7 @@ Evaluated on 10 international student tax questions across 4 metrics (0.0–1.0,
 | **Hit Rate** | Did retrieved chunks collectively contain all expected answer keywords? |
 | **Answer Relevance** | Cosine similarity between the question and the generated answer — does it address what was asked? |
 | **Faithfulness** | Cosine similarity between the generated answer and retrieved context — is the answer grounded? |
+| **LLM Judge** | Gemini scores correctness + completeness + groundedness (avg of 3 sub-scores, 0–1 each) |
 
 ---
 
