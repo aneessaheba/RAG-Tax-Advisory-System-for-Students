@@ -198,6 +198,26 @@ Every query logs how long each step takes and estimates token usage. Printed aft
 
 ---
 
+### Feature 5 — Human Feedback Loop
+
+After every answer, the user can rate it helpful or not. Ratings are saved to `feedback_log.jsonl` for future analysis — e.g. identifying which questions the bot consistently gets wrong.
+
+**In the chat:**
+```
+Was this helpful? (y/n, or press Enter to skip): y
+  Feedback recorded: 👍 Helpful
+```
+
+**Sample `feedback_log.jsonl` entry:**
+```json
+{"timestamp": "2026-02-21T17:31:00", "question": "Do I need to file Form 8843?",
+ "answer_snippet": "Yes, as an F-1 student you must file...", "rating": 1}
+```
+
+Pressing Enter skips without recording. Rating `1` = helpful, `0` = not helpful.
+
+---
+
 ## Tech Stack (All Free)
 
 | Component | Tool | Why |
